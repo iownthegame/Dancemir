@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dancemir</title>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.2/css/bulma.min.css">
+    <!-- https://wikiki.github.io/form/switch/ -->
+    <link rel="stylesheet" href="node_modules/bulma-switch/dist/css/bulma-switch.min.css">
+    <script src="https://kit.fontawesome.com/73d0fef84e.js" crossorigin="anonymous"></script>
+
+    <style>
+      .player-content {
+        font-family: sans-serif;
+        border: 1px solid #eee;
+        border-radius: 2px;
+        padding: 20px 30px;
+        margin-top: 2em;
+        margin-bottom: 40px;
+        user-select: none;
+        overflow-x: auto;
+      }
+
+      .player-wrapper {
+        position: relative;
+        padding-bottom: 56.25%; /* 16:9 */
+        height: 0;
+        margin-top: 20px;
+      }
+
+      .player-wrapper #player {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      .player-mirror #player {
+        transform: scale(-1,1);
+      }
+
+      .player-display-none {
+        display: none;
+      }
+
+      .player-input {
+        width: 500px;
+        max-width: 100%;
+      }
+
+      .player-panel {
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="app" class="container">
+      <section class="section">
+        <h1 class="title is-1">Dancemir</h1>
+        <h1 class="subtitle">Your sweet dance practice helper</h1>
+
+        <div class="field">
+          <div
+            class="player-input control has-icons-right"
+            :class="inputControlClass"
+          >
+            <input
+              name="video_url"
+              placeholder="Paste the Youtube video url here..."
+              :disabled="!ready"
+              @keyup="onInputChange"
+              class="input"
+              :class="inputClass"
+              type="text"
+            >
+            <span class="icon is-small is-right has-text-success" v-if="playable">
+              <i class="fas fa-check"></i>
+            </span>
+
+            <span class="icon is-small is-right has-text-danger" v-if="playerError">
+              <i class="fas fa-times"></i>
+            </span>
+          </div>
+
+          <p
+            v-if="playerError"
+            class="help is-danger"
+          >
+            {{ playerError }}
+          </p>
+        </div>
+
+        <div
+          class="player-content"
+          :class="playerClass"
+        >
+          <div class="player-wrapper">
+            <div id="player"></div>
+          </div>
+
+          <div class="player-panel">
+            <div class="field">
+              <button
+                class="button"
+                @click="togglePlay"
+              >
+                <span class="icon">
+                  <i
+                    class="fas"
+                    :class="stop ? 'fa-play' : 'fa-stop'"
+                  ></i>
+                </span>
+                <span>{{ stop ? 'Play' : 'Stop' }}</span>
+              </button>
+            </div>
+
+            <div class="field">
+              <button
+                class="button"
+                @click="replay"
+              >
+                <span class="icon">
+                  <i class="fas fa-redo-alt"></i>
+                </span>
+                <span>Replay</span>
+              </button>
+            </div>
+
+            <div
+              class="field"
+              @click="toggleLoop"
+            >
+              <input
+                type="checkbox"
+                name="player_loop"
+                class="switch is-thin"
+                :checked="loop"
+              >
+              <label for="player_loop">Loop: {{ loop ? 'on' : 'off' }}</label>
+            </div>
+
+            <div
+              class="field"
+              @click="toggleMirror"
+            >
+              <input
+                type="checkbox"
+                name="player_mirror"
+                class="switch is-thin"
+                :checked="mirror"
+              >
+              <label for="player_mirror">Mirror: {{ mirror ? 'on' : 'off' }}</label>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script src="https://unpkg.com/vue@next"></script>
+
+    <script>
+      // loads the IFrame Player API code asynchronously.
+      const tag = document.createElement('script');
+      tag.src = "https://www.youtube.com/iframe_api";
+
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+      // Vue component
+      const Component = {
+        computed: {
+          playerClass() {
+            return {
+              'player-mirror': this.mirror,
+              // 'player-display-none': this.loading ? false : !this.playable
+              'player-display-none': !this.playable
+            }
+          },
+
+          inputClass() {
+            return {
+              'is-success': this.playable,
+              'is-link': !this.playable,
+              'is-danger': this.playerError
+            }
+          },
+
+          inputControlClass() {
+            return {
+              'is-loading': this.loading
+            }
+          },
+
+          playable() {
+            return !this.playerError && this.player && !this.loading
+          }
+        },
+
+        data() {
+          return {
+            ready: false,
+            player: null,
+            mirror: true,
+            loop: false,
+            videoId: null,
+            playerError: null,
+            loading: false,
+            stop: true,
+            // done: false,
+          }
+        },
+
+        methods: {
+          getVideoIdFromUrl(value) {
+            // https://www.youtube.com/watch?v=lZ1x5txTd1A
+            // https://youtu.be/lZ1x5txTd1A
+            // lZ1x5txTd1A
+
+            let parts = value.split('https://www.youtube.com/watch')
+            if (parts.length == 2) {
+              const urlParams = new URLSearchParams(parts[1]);
+              return urlParams.get('v');
+            }
+
+            parts = value.split('https://youtu.be/')
+            if (parts.length == 2) {
+              return parts[1]
+            }
+
+            return value;
+          },
+
+          onInputChange(event) {
+            console.log(event.target.value);
+            let newVideoId = this.getVideoIdFromUrl(event.target.value.trim());
+
+            if (this.videoId !== newVideoId) {
+              this.videoId = newVideoId;
+              this.initYoutube();
+            }
+          },
+
+          replay(event) {
+            console.log('play')
+            this.player.seekTo(0)
+            this.player.playVideo()
+          },
+
+          toggleMirror() {
+            this.mirror = !this.mirror;
+          },
+
+          toggleLoop() {
+            this.loop = !this.loop;
+            console.log('set Loop to', this.loop);
+            this.player.setLoop(this.loop);
+          },
+
+          togglePlay() {
+            this.stop ? this.playVideo() : this.stopVideo()
+          },
+
+          onYoutubeReady() {
+            console.log('onYoutubeReady')
+            this.ready = true;
+          },
+
+          initYoutube() {
+            console.log('initYoutube', this.videoId)
+
+            if (this.player) {
+              this.player.destroy();
+              this.playerError = null;
+            }
+
+            this.loading = true;
+            const _ = this;
+
+            this.player = new YT.Player('player', {
+              height: '390',
+              width: '640',
+              videoId: this.videoId,
+              playerVars: {
+                playsinline: 1,
+                controls: 1,
+                rel: 0,
+                modestbranding: 1,
+                // autoplay: 0,
+                playlist: this.videoId // in order to work with loop: 1
+              },
+              events: {
+                'onReady': _.onPlayerReady,
+                'onStateChange': _.onPlayerStateChange,
+                'onError': _.onPlayError,
+              }
+            });
+          },
+
+          // The API will call this function when the video player is ready.
+          onPlayerReady(event) {
+            console.log("Player ready");
+            // event.target.playVideo();
+            this.playVideo();
+          },
+
+
+          // The API calls this function when the player's state changes.
+          //    The function indicates that when playing a video (state=1),
+          //    the player should play for six seconds and then stop.
+          onPlayerStateChange(event) {
+            console.log("Player state changed", event);
+            // if (event.data == YT.PlayerState.PLAYING && !this.done) {
+            //   setTimeout(this.stopVideo, 6000);
+            //   this.done = true;
+            // }
+            if (this.loading) {
+              this.loading = false
+            }
+
+            if (event.data == YT.PlayerState.PLAYING && this.stop) {
+              this.stop = false;
+            }
+
+            if (event.data == YT.PlayerState.PAUSED && !this.stop) {
+              this.stop = true;
+            }
+          },
+
+          onPlayError() {
+            console.log("Player error", event.data);
+            const error = JSON.parse(event.data);
+
+            if (this.loading) { this.loading = false }
+
+            if (error.info === 150 || error.info === 101) { // '5uBV0zJsTlE';
+              this.playerError = 'load error, the video cannot be embeded, please try other videos.'
+            } else {
+              this.playerError = 'load error, please try again.'
+            }
+          },
+
+          stopVideo() {
+            this.player.pauseVideo();
+            this.stop = true;
+          },
+
+          playVideo() {
+            this.player.playVideo();
+            this.stop = false;
+          }
+        }
+      }
+
+      const app = Vue.createApp(Component)
+      const root = app.mount('#app')
+
+      // This function creates an <iframe> (and YouTube player)
+      //    after the API code downloads.
+      onYouTubeIframeAPIReady = () => {
+        console.log("onYouTubeIframeAPIReady, try otdOcqvBe_o or 5uBV0zJsTlE");
+        root.onYoutubeReady();
+      };
+    </script>
+  </body>
+</html>
