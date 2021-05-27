@@ -106,57 +106,93 @@
           </div>
 
           <div class="player-panel">
-            <div class="field">
-              <button
-                class="button"
-                @click="togglePlay"
-              >
-                <span class="icon">
-                  <i
-                    class="fas"
-                    :class="stop ? 'fa-play' : 'fa-stop'"
-                  ></i>
-                </span>
-                <span>{{ stop ? 'Play' : 'Stop' }}</span>
-              </button>
-            </div>
+            <div class="columns">
+              <div class="column">
+                <div class="field">
+                  <button
+                    class="button"
+                    @click="togglePlay"
+                  >
+                    <span class="icon">
+                      <i
+                        class="fas"
+                        :class="stop ? 'fa-play' : 'fa-stop'"
+                      ></i>
+                    </span>
+                    <span>{{ stop ? 'Play' : 'Stop' }}</span>
+                  </button>
+                </div>
 
-            <div class="field">
-              <button
-                class="button"
-                @click="replay"
-              >
-                <span class="icon">
-                  <i class="fas fa-redo-alt"></i>
-                </span>
-                <span>Replay</span>
-              </button>
-            </div>
+                <div class="field">
+                  <button
+                    class="button"
+                    @click="replay"
+                  >
+                    <span class="icon">
+                      <i class="fas fa-redo-alt"></i>
+                    </span>
+                    <span>Replay</span>
+                  </button>
+                </div>
 
-            <div
-              class="field"
-              @click="toggleLoop"
-            >
-              <input
-                type="checkbox"
-                name="player_loop"
-                class="switch is-thin"
-                :checked="loop"
-              >
-              <label for="player_loop">Loop: {{ loop ? 'on' : 'off' }}</label>
-            </div>
+                <div
+                  class="field"
+                  @click="toggleLoop"
+                >
+                  <input
+                    type="checkbox"
+                    name="player_loop"
+                    class="switch is-thin"
+                    :checked="loop"
+                  >
+                  <label for="player_loop">Loop: {{ loop ? 'on' : 'off' }}</label>
+                </div>
 
-            <div
-              class="field"
-              @click="toggleMirror"
-            >
-              <input
-                type="checkbox"
-                name="player_mirror"
-                class="switch is-thin"
-                :checked="mirror"
-              >
-              <label for="player_mirror">Mirror: {{ mirror ? 'on' : 'off' }}</label>
+                <div
+                  class="field"
+                  @click="toggleMirror"
+                >
+                  <input
+                    type="checkbox"
+                    name="player_mirror"
+                    class="switch is-thin"
+                    :checked="mirror"
+                  >
+                  <label for="player_mirror">Mirror: {{ mirror ? 'on' : 'off' }}</label>
+                </div>
+              </div>
+
+              <div class="column">
+                <div class="panel">
+                  <!--p class="panel-heading">
+                    Chapters
+                  </p-->
+                  <a
+                    class="panel-block"
+                    :class="chapterIdx === null ? 'is-active' : ''"
+                    key="-1"
+                    @click="() => setChapter(null)"
+                  >
+                    <span class="panel-icon">
+                      <i class="fas fa-book" aria-hidden="true"></i>
+                    </span>
+                    Whole song
+                  </a>
+
+                  <a
+                    v-for="(chapter, idx) in chapters"
+                    class="panel-block"
+                    :class="idx === chapterIdx ? 'is-active' : ''"
+                    :key="idx"
+                    @click="() => setChapter(idx)"
+                  >
+                    <span class="panel-icon">
+                      <i class="fas fa-book" aria-hidden="true"></i>
+                    </span>
+                    Chapter {{chapter.name}} - [{{secondsToTime(chapter.start)}} ~ {{secondsToTime(chapter.end)}}]
+                  </a>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -214,6 +250,29 @@
             loading: false,
             stop: true,
             // done: false,
+            chapterIdx: null,
+            chapters: [
+              {
+                name: 'Verse A',
+                start: 20,
+                end: 50
+              },
+              {
+                name: 'Chorus',
+                start: 50,
+                end: 80
+              },
+              {
+                name: 'Verse B',
+                start: 80,
+                end: 110
+              },
+              {
+                name: 'Bridge',
+                start: 140,
+                end: 160
+              }
+            ]
           }
         },
 
@@ -265,6 +324,10 @@
 
           togglePlay() {
             this.stop ? this.playVideo() : this.stopVideo()
+          },
+
+          setChapter(idx) {
+            this.chapterIdx = idx;
           },
 
           onYoutubeReady() {
@@ -354,7 +417,42 @@
           playVideo() {
             this.player.playVideo();
             this.stop = false;
+          },
+
+          setTimeLister() {
+            const self = this;
+
+            setInterval(() => {
+              if (self.player && !self.stop && self.chapterIdx !== null && self.loop) {
+                const currentTime = self.player.playerInfo.currentTime;
+                const chapter = self.chapters[self.chapterIdx];
+                if (Math.round(currentTime) >= chapter.end) {
+                  self.player.seekTo(chapter.start)
+                }
+              }
+            }, 1000);
+          },
+
+          secondsToTime(seconds) {
+            // const h = Math.floor(e / 3600).toString().padStart(2,'0'),
+            //     m = Math.floor(e % 3600 / 60).toString().padStart(2,'0'),
+            //     s = Math.floor(e % 60).toString().padStart(2,'0');
+
+            // return h + ':' + m + ':' + s;
+            const format = val => `0${Math.floor(val)}`.slice(-2)
+            const hours = seconds / 3600
+            const minutes = (seconds % 3600) / 60
+
+            if (hours >= 1) {
+              return [hours, minutes, seconds % 60].map(format).join(':')
+            }
+
+            return [minutes, seconds % 60].map(format).join(':')
           }
+        },
+
+        mounted() {
+          this.setTimeLister()
         }
       }
 
@@ -364,7 +462,7 @@
       // This function creates an <iframe> (and YouTube player)
       //    after the API code downloads.
       onYouTubeIframeAPIReady = () => {
-        console.log("onYouTubeIframeAPIReady, try otdOcqvBe_o or 5uBV0zJsTlE");
+        console.log("onYouTubeIframeAPIReady, try otdOcqvBe_o or 5uBV0zJsTlE or uxmP4b2a0uY");
         root.onYoutubeReady();
       };
     </script>
