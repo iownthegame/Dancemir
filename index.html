@@ -15,6 +15,24 @@
     <script src="https://kit.fontawesome.com/73d0fef84e.js" crossorigin="anonymous"></script>
 
     <style>
+      @font-face {
+        font-family: 'Gronika';
+        src: url('/fonts/gronika.woff2') format('woff2'); /* Super Modern Browsers */
+      }
+
+      @font-face {
+        font-family: 'TtNorms';
+        src: url('/fonts/tt_norms_pro_regular-webfont.woff2') format('woff2'); /* Super Modern Browsers */
+      }
+
+      body, input {
+        font-family: 'TtNorms', Fallback, sans-serif;
+      }
+
+      h1.title {
+        font-family: 'Gronika', Fallback, sans-serif;
+      }
+
       .player-content {
         font-family: sans-serif;
         border: 1px solid #eee;
@@ -63,7 +81,7 @@
   <body>
     <div id="app" class="container">
       <section class="section">
-        <h1 class="title is-1">Dancemir</h1>
+        <h1 class="title is-1">DANCEMIR</h1>
         <h1 class="subtitle">Your sweet dance practice helper</h1>
 
         <div class="field">
